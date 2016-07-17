@@ -69,6 +69,14 @@ public class CLIInterface {
                     logger.info("Resetting db set to [{}]", resetStr);
                     cliOptions.put(SystemProperties.PROPERTY_DB_RESET, resetStr.toString());
                 }
+
+                if (args[i].equals("-support-daohf-fork")) {
+                    cliOptions.put(SystemProperties.PROPERTY_DAO_HARDFORK_ENABLED, true);
+                }
+
+                if (args[i].equals("-oppose-daohf-fork")) {
+                    cliOptions.put(SystemProperties.PROPERTY_DAO_HARDFORK_ENABLED, false);
+                }
             }
 
             if (cliOptions.size() > 0) {

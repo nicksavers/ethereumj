@@ -2,6 +2,7 @@ package org.ethereum.core;
 
 import org.ethereum.config.CommonConfig;
 import org.ethereum.config.SystemProperties;
+import org.ethereum.core.daohf.SlockitDao;
 import org.ethereum.crypto.HashUtil;
 import org.ethereum.crypto.SHA3Helper;
 import org.ethereum.datasource.HashMapDB;
@@ -520,6 +521,10 @@ public class BlockchainImpl implements Blockchain, org.ethereum.facade.Blockchai
             AdvancedDeviceUtils.adjustDetailedTracing(config, block.getNumber());
         }
 
+        if(config.daoHardforkEnabled() && block.getNumber() == SlockitDao.FORK_BLOCK) {
+            applyDAOHardFork(track);
+        }
+
         BlockSummary summary = processBlock(block);
         List<TransactionReceipt> receipts = summary.getReceipts();
 
@@ -576,6 +581,24 @@ public class BlockchainImpl implements Blockchain, org.ethereum.facade.Blockchai
         }
 
         return summary;
+    }
+
+    /**
+     * Modifies the state database according to the DAO hard-fork
+     * rules, transferring all balances of a set of DAO accounts to a single refund contract.
+     */
+    private void applyDAOHardFork(Repository track) {
+        // Retrieve the contract to refund balances into
+        AccountState refund = track.getAccountState(SlockitDao.BENEFICIARY);
+        track.startTracking();
+        // Move every DAO account and extra-balance account funds into the refund contract
+        for (byte[] address : SlockitDao.DRAIN_LIST) {
+            AccountState drainAccount = track.getAccountState(address);
+            BigInteger drainAccountBalance = drainAccount.getBalance();
+            drainAccount.subFromBalance(drainAccountBalance);
+            refund.addToBalance(drainAccountBalance);
+        }
+        track.commit();
     }
 
     public void flush() {
@@ -793,9 +816,7 @@ public class BlockchainImpl implements Blockchain, org.ethereum.facade.Blockchai
     private BlockSummary processBlock(Block block) {
 
         if (!block.isGenesis() && !config.blockChainOnly()) {
-            // wallet.addTransactions(block.getTransactionsList());
             return applyBlock(block);
-            // wallet.processBlock(block);
         }
         else {
             return new BlockSummary(block, new HashMap<byte[], BigInteger>(), new ArrayList<TransactionReceipt>(), new ArrayList<TransactionExecutionSummary>());
